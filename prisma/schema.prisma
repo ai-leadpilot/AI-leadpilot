@@ -1,0 +1,268 @@
+// LeadPilot AI — Prisma Schema
+// Run `npm run db:generate` after changes, `npm run db:push` to sync to DB.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  PAUSED
+}
+
+enum SubscriptionPlan {
+  FREE
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
+enum CreditTransactionType {
+  PURCHASE
+  USAGE
+  REFUND
+  BONUS
+  EXPIRY
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  CLOSED_WON
+  CLOSED_LOST
+  NURTURING
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+model User {
+  id              String   @id @default(cuid())
+  supabaseId      String   @unique @map("supabase_id")
+  email           String   @unique
+  name            String?
+  avatarUrl       String?  @map("avatar_url")
+  emailVerified   DateTime? @map("email_verified")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organizationMembers OrganizationMember[]
+  ownedOrganizations  Organization[]       @relation("OrgOwner")
+  auditLogs           AuditLog[]
+
+  @@map("users")
+}
+
+// ─── Organizations ───────────────────────────────────────────────────────────
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  logoUrl     String?  @map("logo_url")
+  website     String?
+  industry    String?
+  size        String?
+  ownerId     String   @map("owner_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  owner        User                 @relation("OrgOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members      OrganizationMember[]
+  subscription Subscription?
+  aiCredits    AiCredits?
+  leads        Lead[]
+  campaigns    Campaign[]
+  auditLogs    AuditLog[]
+
+  @@map("organizations")
+}
+
+// ─── Organization Members ────────────────────────────────────────────────────
+
+model OrganizationMember {
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+  userId         String    @map("user_id")
+  role           UserRole  @default(MEMBER)
+  invitedEmail   String?   @map("invited_email")
+  acceptedAt     DateTime? @map("accepted_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@map("organization_members")
+}
+
+// ─── Subscriptions ───────────────────────────────────────────────────────────
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  organizationId       String             @unique @map("organization_id")
+  stripeCustomerId     String?            @unique @map("stripe_customer_id")
+  stripeSubscriptionId String?            @unique @map("stripe_subscription_id")
+  stripePriceId        String?            @map("stripe_price_id")
+  stripeProductId      String?            @map("stripe_product_id")
+  plan                 SubscriptionPlan   @default(FREE)
+  status               SubscriptionStatus @default(TRIALING)
+  trialEndsAt          DateTime?          @map("trial_ends_at")
+  currentPeriodStart   DateTime?          @map("current_period_start")
+  currentPeriodEnd     DateTime?          @map("current_period_end")
+  cancelAtPeriodEnd    Boolean            @default(false) @map("cancel_at_period_end")
+  canceledAt           DateTime?          @map("canceled_at")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+// ─── AI Credits ───────────────────────────────────────────────────────────────
+
+model AiCredits {
+  id             String   @id @default(cuid())
+  organizationId String   @unique @map("organization_id")
+  balance        Int      @default(0)
+  lifetimeUsed   Int      @default(0) @map("lifetime_used")
+  lifetimePurchased Int   @default(0) @map("lifetime_purchased")
+  resetAt        DateTime? @map("reset_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  transactions CreditTransaction[]
+
+  @@map("ai_credits")
+}
+
+model CreditTransaction {
+  id          String                @id @default(cuid())
+  aiCreditsId String                @map("ai_credits_id")
+  type        CreditTransactionType
+  amount      Int
+  description String?
+  metadata    Json?
+  createdAt   DateTime              @default(now()) @map("created_at")
+
+  // Relations
+  aiCredits AiCredits @relation(fields: [aiCreditsId], references: [id], onDelete: Cascade)
+
+  @@map("credit_transactions")
+}
+
+// ─── Leads ───────────────────────────────────────────────────────────────────
+
+model Lead {
+  id             String     @id @default(cuid())
+  organizationId String     @map("organization_id")
+  firstName      String?    @map("first_name")
+  lastName       String?    @map("last_name")
+  email          String?
+  phone          String?
+  company        String?
+  title          String?
+  linkedinUrl    String?    @map("linkedin_url")
+  website        String?
+  status         LeadStatus @default(NEW)
+  score          Int?
+  notes          String?
+  tags           String[]
+  customFields   Json?      @map("custom_fields")
+  aiSummary      String?    @map("ai_summary")
+  lastContactedAt DateTime? @map("last_contacted_at")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@map("leads")
+}
+
+// ─── Campaigns ───────────────────────────────────────────────────────────────
+
+model Campaign {
+  id             String         @id @default(cuid())
+  organizationId String         @map("organization_id")
+  name           String
+  description    String?
+  status         CampaignStatus @default(DRAFT)
+  type           String
+  scheduledAt    DateTime?      @map("scheduled_at")
+  completedAt    DateTime?      @map("completed_at")
+  settings       Json?
+  stats          Json?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("campaigns")
+}
+
+// ─── Audit Logs ──────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")
+  action         String
+  resource       String
+  resourceId     String?  @map("resource_id")
+  metadata       Json?
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("audit_logs")
+}
