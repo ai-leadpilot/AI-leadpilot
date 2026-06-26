@@ -63,6 +63,26 @@ export default function HomePage() {
           </div>
         ))}
       </section>
+
+      {/* Footer */}
+      <footer className="border-t border-white/10 py-10 px-8 max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-400">
+        <div className="flex items-center gap-2">
+          <Zap className="w-4 h-4 text-blue-400" />
+          <span className="font-semibold text-white">LeadPilot AI</span>
+          <span className="ml-2">© {new Date().getFullYear()} All rights reserved.</span>
+        </div>
+        <div className="flex items-center gap-6">
+          <Link href="/pricing" className="hover:text-white transition-colors">
+            Pricing
+          </Link>
+          <Link href="/login" className="hover:text-white transition-colors">
+            Sign in
+          </Link>
+          <Link href="/register" className="hover:text-white transition-colors">
+            Get started
+          </Link>
+        </div>
+      </footer>
     </main>
   );
 }
