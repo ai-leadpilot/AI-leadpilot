@@ -10,6 +10,9 @@ export default function HomePage() {
           <span className="text-xl font-bold">LeadPilot AI</span>
         </div>
         <div className="flex items-center gap-4">
+          <Link href="/pricing" className="text-sm text-slate-300 hover:text-white transition-colors">
+            Pricing
+          </Link>
           <Link href="/login" className="text-sm text-slate-300 hover:text-white transition-colors">
             Sign in
           </Link>
