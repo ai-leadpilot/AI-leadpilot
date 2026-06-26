@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import { RegisterForm } from "@/components/auth/RegisterForm";
 
-export const metadata: Metadata = { title: "Create Account" };
+export const metadata: Metadata = { title: "Create Account — LeadPilot AI" };
 
 export default function RegisterPage() {
   return (
@@ -8,13 +9,7 @@ export default function RegisterPage() {
       <h2 className="text-2xl font-semibold text-slate-900 dark:text-white mb-6">
         Create your account
       </h2>
-      {/* RegisterForm component will go here */}
-      <p className="text-center text-sm text-slate-600 dark:text-slate-400 mt-6">
-        Already have an account?{" "}
-        <a href="/login" className="text-blue-600 hover:underline font-medium">
-          Sign in
-        </a>
-      </p>
+      <RegisterForm />
     </div>
   );
 }
